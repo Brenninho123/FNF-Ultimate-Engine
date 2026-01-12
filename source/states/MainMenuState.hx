@@ -19,17 +19,17 @@ class MainMenuState extends MusicBeatState
 		'freeplay',
 		
 		#if MODS_ALLOWED
-		'mods',
+		//'mods',
 		#end
 		
 		#if ACHIEVEMENTS_ALLOWED
-		'awards',
+		//'awards',
 		#end
 		
 		'credits',
 		
 		#if !switch
-		'donate',
+		//'donate',
 		#end
 		
 		'options'
