@@ -61,10 +61,10 @@
 	<!-- __________________________ Game Assets & Etc. __________________________ -->
 
 	<!-- Assets -->
-	<assets path="assets/preload/mobile "library="mobile" if="mobile"/>
 	<assets path="assets/fonts" />
 	<assets path="assets/shared"        exclude="*.ogg" if="web"/>
 	<assets path="assets/shared"        exclude="*.mp3" unless="web"/>
+	<assets path="assets/shared/mobile" library="mobile"        if="mobile"/>
 	<assets path="assets/videos"        library="videos"        if="VIDEOS_ALLOWED"/>
 	<assets path="assets/songs"         library="songs"         exclude="*.ogg" if="web"/>
 	<assets path="assets/songs"         library="songs"         exclude="*.mp3" unless="web"/>
