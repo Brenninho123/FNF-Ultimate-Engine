@@ -17,8 +17,6 @@ class FPSCounter extends Sprite
 	public var isAdvanced:Bool = false;
 	public var backgroundOpacity:Float = 0.5;
 
-	public var os:String = '';
-
 	var times:Array<Float> = [];
 	var deltaTimeout:Float = 0.0;
 
@@ -41,7 +39,7 @@ class FPSCounter extends Sprite
 	{
 		background = new Shape();
 		background.graphics.beginFill(0x2c2f30, 1);
-		background.graphics.drawRect(0, 0, 260, 100);
+		background.graphics.drawRect(0, 0, 320, 100);
 		background.graphics.endFill();
 		background.alpha = backgroundOpacity;
 		addChild(background);
@@ -49,7 +47,7 @@ class FPSCounter extends Sprite
 		infoDisplay = new TextField();
 		infoDisplay.x = 8;
 		infoDisplay.y = 8;
-		infoDisplay.width = 240;
+		infoDisplay.width = 300;
 		infoDisplay.selectable = false;
 		infoDisplay.mouseEnabled = false;
 		infoDisplay.defaultTextFormat = new TextFormat("_sans", 12, color);
@@ -86,6 +84,7 @@ class FPSCounter extends Sprite
 		var info:Array<String> = [];
 		info.push('FPS: $currentFPS');
 		info.push('Memory: ${FlxStringUtil.formatBytes(mem)}');
+		info.push('Ultimate Engine Alpha'); // ← watermark
 
 		infoDisplay.text = info.join('\n');
 
