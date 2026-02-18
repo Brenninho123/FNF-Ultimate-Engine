@@ -2,81 +2,53 @@ package debug;
 
 import flixel.FlxG;
 import flixel.util.FlxStringUtil;
-import funkin.util.MemoryUtil;
 import openfl.display.Shape;
 import openfl.display.Sprite;
 import openfl.text.TextField;
 import openfl.text.TextFormat;
-import openfl.system.System as OpenFlSystem;
-import lime.system.System as LimeSystem;
+import openfl.system.System;
 
-#if cpp
-@:access(lime._internal.backend.native.NativeCFFI)
-#end
-
+/**
+ * FPSCounter compatível com Psych 0.6 / Ultimate Engine
+ */
 class FPSCounter extends Sprite
 {
-	// ================= CONFIG =================
 	public var currentFPS(default, null):Int = 0;
-	public var isAdvanced(default, set):Bool = false;
-	public var backgroundOpacity(default, set):Float = 0.5;
+	public var isAdvanced:Bool = false;
+	public var backgroundOpacity:Float = 0.5;
 
 	public var os:String = '';
 
-	static final UPDATE_DELAY:Int = 100;
-	static final INNER_RECT_DIFF:Int = 3;
-	static final OUTER_RECT_DIMENSIONS:Array<Int> = [234, 201];
-	static final OTHERS_OFFSET:Int = 8;
-
-	// ================= VARS =================
 	var times:Array<Float> = [];
 	var deltaTimeout:Float = 0.0;
 
 	var background:Shape;
 	var infoDisplay:TextField;
 
-	#if !html5
-	var gcMem:Float = 0.0;
-	var gcMemPeak:Float = 0.0;
-	var taskMem:Float = 0.0;
-	var taskMemPeak:Float = 0.0;
-	#end
+	static final UPDATE_DELAY:Int = 100;
 
-	// ================= CONSTRUCTOR =================
 	public function new(x:Float = 10, y:Float = 10, color:Int = 0xFFFFFF)
 	{
 		super();
 		this.x = x;
 		this.y = y;
 
-		buildOSString();
-		buildDisplay(color, false);
+		buildDisplay(color);
 	}
 
-	// ================= OS INFO =================
-	function buildOSString()
+	// ================= BUILD =================
+	function buildDisplay(color:Int)
 	{
-		if (LimeSystem.platformName == LimeSystem.platformVersion || LimeSystem.platformVersion == null)
-			os = 'OS: ${LimeSystem.platformName}';
-		else
-			os = 'OS: ${LimeSystem.platformName} - ${LimeSystem.platformVersion}';
-	}
-
-	// ================= BUILD DISPLAY =================
-	function buildDisplay(color:Int, advanced:Bool)
-	{
-		removeChildren();
-
 		background = new Shape();
 		background.graphics.beginFill(0x2c2f30, 1);
-		background.graphics.drawRect(0, 0, 260, advanced ? 180 : 80);
+		background.graphics.drawRect(0, 0, 260, 100);
 		background.graphics.endFill();
 		background.alpha = backgroundOpacity;
 		addChild(background);
 
 		infoDisplay = new TextField();
-		infoDisplay.x = OTHERS_OFFSET;
-		infoDisplay.y = OTHERS_OFFSET;
+		infoDisplay.x = 8;
+		infoDisplay.y = 8;
 		infoDisplay.width = 240;
 		infoDisplay.selectable = false;
 		infoDisplay.mouseEnabled = false;
@@ -88,11 +60,7 @@ class FPSCounter extends Sprite
 	// ================= ENTER FRAME =================
 	override function __enterFrame(deltaTime:Float):Void
 	{
-		#if cpp
-		final now:Float = lime._internal.backend.native.NativeCFFI.lime_sdl_get_ticks();
-		#else
-		final now:Float = haxe.Timer.stamp() * 1000;
-		#end
+		var now:Float = haxe.Timer.stamp() * 1000;
 
 		times.push(now);
 		while (times[0] < now - 1000)
@@ -106,37 +74,18 @@ class FPSCounter extends Sprite
 
 		currentFPS = times.length;
 
-		#if !html5
-		gcMem = MemoryUtil.getGCMemory();
-		if (gcMem > gcMemPeak) gcMemPeak = gcMem;
-
-		if (MemoryUtil.supportsTaskMem())
-		{
-			taskMem = MemoryUtil.getTaskMemory();
-			if (taskMem > taskMemPeak) taskMemPeak = taskMem;
-		}
-		#end
-
 		updateDisplay();
 		deltaTimeout = 0.0;
 	}
 
-	// ================= UPDATE DISPLAY =================
+	// ================= UPDATE =================
 	function updateDisplay()
 	{
+		var mem:Float = System.totalMemory;
+
 		var info:Array<String> = [];
-
 		info.push('FPS: $currentFPS');
-
-		#if !html5
-		info.push('GC MEM: ${FlxStringUtil.formatBytes(gcMem)} / ${FlxStringUtil.formatBytes(gcMemPeak)}');
-
-		if (MemoryUtil.supportsTaskMem())
-			info.push('TASK MEM: ${FlxStringUtil.formatBytes(taskMem)} / ${FlxStringUtil.formatBytes(taskMemPeak)}');
-		#end
-
-		if (isAdvanced)
-			info.push(os);
+		info.push('Memory: ${FlxStringUtil.formatBytes(mem)}');
 
 		infoDisplay.text = info.join('\n');
 
@@ -145,21 +94,11 @@ class FPSCounter extends Sprite
 			infoDisplay.textColor = 0xFFFF0000;
 	}
 
-	// ================= SETTERS =================
-	function set_isAdvanced(value:Bool):Bool
+	// ================= COMPAT COM MAIN =================
+	public inline function positionFPS(X:Float, Y:Float, ?scale:Float = 1)
 	{
-		buildDisplay(0xFFFFFF, value);
-		return isAdvanced = value;
+		scaleX = scaleY = scale;
+		x = FlxG.game.x + X;
+		y = FlxG.game.y + Y;
 	}
-
-	function set_backgroundOpacity(value:Float):Float
-	{
-		if (background != null)
-			background.alpha = value;
-		return backgroundOpacity = value;
-	}
-
-	// ================= MEMORY =================
-	inline function get_memoryMegas():Float
-		return cast(OpenFlSystem.totalMemory, UInt);
 }
