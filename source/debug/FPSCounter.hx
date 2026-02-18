@@ -1,142 +1,165 @@
 package debug;
 
 import flixel.FlxG;
+import flixel.util.FlxStringUtil;
+import funkin.util.MemoryUtil;
+import openfl.display.Shape;
+import openfl.display.Sprite;
 import openfl.text.TextField;
 import openfl.text.TextFormat;
 import openfl.system.System as OpenFlSystem;
 import lime.system.System as LimeSystem;
 
-/**
-	The FPS class provides an easy-to-use monitor to display
-	the current frame rate of an OpenFL project
-**/
 #if cpp
-#if windows
-@:cppFileCode('#include <windows.h>')
-#elseif (ios || mac)
-@:cppFileCode('#include <mach-o/arch.h>')
-#else
-@:headerInclude('sys/utsname.h')
+@:access(lime._internal.backend.native.NativeCFFI)
 #end
-#end
-class FPSCounter extends TextField
+
+class FPSCounter extends Sprite
 {
-	/**
-		The current frame rate, expressed using frames-per-second
-	**/
-	public var currentFPS(default, null):Int;
-
-	/**
-		The current memory usage (WARNING: this is NOT your total program memory usage, rather it shows the garbage collector memory)
-	**/
-	public var memoryMegas(get, never):Float;
-
-	@:noCompletion private var times:Array<Float>;
+	// ================= CONFIG =================
+	public var currentFPS(default, null):Int = 0;
+	public var isAdvanced(default, set):Bool = false;
+	public var backgroundOpacity(default, set):Float = 0.5;
 
 	public var os:String = '';
 
-	public function new(x:Float = 10, y:Float = 10, color:Int = 0x000000)
-	{
-		super();
+	static final UPDATE_DELAY:Int = 100;
+	static final INNER_RECT_DIFF:Int = 3;
+	static final OUTER_RECT_DIMENSIONS:Array<Int> = [234, 201];
+	static final OTHERS_OFFSET:Int = 8;
 
-		if (LimeSystem.platformName == LimeSystem.platformVersion || LimeSystem.platformVersion == null)
-			os = '\nOS: ${LimeSystem.platformName}' #if cpp + ' ${getArch() != 'Unknown' ? getArch() : ''}' #end;
-		else
-			os = '\nOS: ${LimeSystem.platformName}' #if cpp + ' ${getArch() != 'Unknown' ? getArch() : ''}' #end + ' - ${LimeSystem.platformVersion}';
-
-		positionFPS(x, y);
-
-		currentFPS = 0;
-		selectable = false;
-		mouseEnabled = false;
-		defaultTextFormat = new TextFormat("_sans", 14, color);
-		width = FlxG.width;
-		multiline = true;
-		text = "FPS: ";
-
-		times = [];
-	}
-
+	// ================= VARS =================
+	var times:Array<Float> = [];
 	var deltaTimeout:Float = 0.0;
 
-	// Event Handlers
-	private override function __enterFrame(deltaTime:Float):Void
+	var background:Shape;
+	var infoDisplay:TextField;
+
+	#if !html5
+	var gcMem:Float = 0.0;
+	var gcMemPeak:Float = 0.0;
+	var taskMem:Float = 0.0;
+	var taskMemPeak:Float = 0.0;
+	#end
+
+	// ================= CONSTRUCTOR =================
+	public function new(x:Float = 10, y:Float = 10, color:Int = 0xFFFFFF)
 	{
-		// prevents the overlay from updating every frame, why would you need to anyways
-		if (deltaTimeout > 1000) {
-			deltaTimeout = 0.0;
+		super();
+		this.x = x;
+		this.y = y;
+
+		buildOSString();
+		buildDisplay(color, false);
+	}
+
+	// ================= OS INFO =================
+	function buildOSString()
+	{
+		if (LimeSystem.platformName == LimeSystem.platformVersion || LimeSystem.platformVersion == null)
+			os = 'OS: ${LimeSystem.platformName}';
+		else
+			os = 'OS: ${LimeSystem.platformName} - ${LimeSystem.platformVersion}';
+	}
+
+	// ================= BUILD DISPLAY =================
+	function buildDisplay(color:Int, advanced:Bool)
+	{
+		removeChildren();
+
+		background = new Shape();
+		background.graphics.beginFill(0x2c2f30, 1);
+		background.graphics.drawRect(0, 0, 260, advanced ? 180 : 80);
+		background.graphics.endFill();
+		background.alpha = backgroundOpacity;
+		addChild(background);
+
+		infoDisplay = new TextField();
+		infoDisplay.x = OTHERS_OFFSET;
+		infoDisplay.y = OTHERS_OFFSET;
+		infoDisplay.width = 240;
+		infoDisplay.selectable = false;
+		infoDisplay.mouseEnabled = false;
+		infoDisplay.defaultTextFormat = new TextFormat("_sans", 12, color);
+		infoDisplay.multiline = true;
+		addChild(infoDisplay);
+	}
+
+	// ================= ENTER FRAME =================
+	override function __enterFrame(deltaTime:Float):Void
+	{
+		#if cpp
+		final now:Float = lime._internal.backend.native.NativeCFFI.lime_sdl_get_ticks();
+		#else
+		final now:Float = haxe.Timer.stamp() * 1000;
+		#end
+
+		times.push(now);
+		while (times[0] < now - 1000)
+			times.shift();
+
+		if (deltaTimeout < UPDATE_DELAY)
+		{
+			deltaTimeout += deltaTime;
 			return;
 		}
 
-		final now:Float = haxe.Timer.stamp() * 1000;
-		times.push(now);
-		while (times[0] < now - 1000) times.shift();
+		currentFPS = times.length;
 
-		currentFPS = times.length < FlxG.updateFramerate ? times.length : FlxG.updateFramerate;		
-		updateText();
-		deltaTimeout += deltaTime;
+		#if !html5
+		gcMem = MemoryUtil.getGCMemory();
+		if (gcMem > gcMemPeak) gcMemPeak = gcMem;
+
+		if (MemoryUtil.supportsTaskMem())
+		{
+			taskMem = MemoryUtil.getTaskMemory();
+			if (taskMem > taskMemPeak) taskMemPeak = taskMem;
+		}
+		#end
+
+		updateDisplay();
+		deltaTimeout = 0.0;
 	}
 
-	public dynamic function updateText():Void // so people can override it in hscript
+	// ================= UPDATE DISPLAY =================
+	function updateDisplay()
 	{
-		text = 
-		'FPS: $currentFPS' + 
-		'\nMemory: ${flixel.util.FlxStringUtil.formatBytes(memoryMegas)}' +
-		os;
+		var info:Array<String> = [];
 
-		textColor = 0xFFFFFFFF;
+		info.push('FPS: $currentFPS');
+
+		#if !html5
+		info.push('GC MEM: ${FlxStringUtil.formatBytes(gcMem)} / ${FlxStringUtil.formatBytes(gcMemPeak)}');
+
+		if (MemoryUtil.supportsTaskMem())
+			info.push('TASK MEM: ${FlxStringUtil.formatBytes(taskMem)} / ${FlxStringUtil.formatBytes(taskMemPeak)}');
+		#end
+
+		if (isAdvanced)
+			info.push(os);
+
+		infoDisplay.text = info.join('\n');
+
+		infoDisplay.textColor = 0xFFFFFFFF;
 		if (currentFPS < FlxG.drawFramerate * 0.5)
-			textColor = 0xFFFF0000;
+			infoDisplay.textColor = 0xFFFF0000;
 	}
 
+	// ================= SETTERS =================
+	function set_isAdvanced(value:Bool):Bool
+	{
+		buildDisplay(0xFFFFFF, value);
+		return isAdvanced = value;
+	}
+
+	function set_backgroundOpacity(value:Float):Float
+	{
+		if (background != null)
+			background.alpha = value;
+		return backgroundOpacity = value;
+	}
+
+	// ================= MEMORY =================
 	inline function get_memoryMegas():Float
 		return cast(OpenFlSystem.totalMemory, UInt);
-
-	public inline function positionFPS(X:Float, Y:Float, ?scale:Float = 1){
-		scaleX = scaleY = #if android (scale > 1 ? scale : 1) #else (scale < 1 ? scale : 1) #end;
-		x = FlxG.game.x + X;
-		y = FlxG.game.y + Y;
-	}
-
-	#if cpp
-	#if windows
-	@:functionCode('
-		SYSTEM_INFO osInfo;
-
-		GetSystemInfo(&osInfo);
-
-		switch(osInfo.wProcessorArchitecture)
-		{
-			case 9:
-				return ::String("x86_64");
-			case 5:
-				return ::String("ARM");
-			case 12:
-				return ::String("ARM64");
-			case 6:
-				return ::String("IA-64");
-			case 0:
-				return ::String("x86");
-			default:
-				return ::String("Unknown");
-		}
-	')
-	#elseif (ios || mac)
-	@:functionCode('
-		const NXArchInfo *archInfo = NXGetLocalArchInfo();
-    	return ::String(archInfo == NULL ? "Unknown" : archInfo->name);
-	')
-	#else
-	@:functionCode('
-		struct utsname osInfo{};
-		uname(&osInfo);
-		return ::String(osInfo.machine);
-	')
-	#end
-	@:noCompletion
-	private function getArch():String
-	{
-		return "Unknown";
-	}
-	#end
 }
