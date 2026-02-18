@@ -16,7 +16,7 @@ import states.TitleState;
 	public var screensaver:Bool = false;
 	public var wideScreen:Bool = false;
 	#if android
-	public var storageType:String = "EXTERNAL_DATA";
+	public var storageType:String = "EXTERNAL";
 	#end
 	public var hitboxType:String = "Gradient";
 	public var popUpRating:Bool = true;
@@ -26,6 +26,8 @@ import states.TitleState;
 	public var downScroll:Bool = false;
 	public var middleScroll:Bool = false;
 	public var opponentStrums:Bool = true;
+ public var strumlineBG:Bool = false;
+ public var strumlineBGAlpha:Float = 0.5;
 	public var showFPS:Bool = true;
 	public var flashing:Bool = true;
 	public var autoPause:Bool = true;
